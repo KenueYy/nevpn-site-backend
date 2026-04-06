@@ -11,13 +11,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/KenueYy/nevpn-site-backend/internal/db"
 	"github.com/KenueYy/nevpn-site-backend/internal/models"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/redis/go-redis/v9"
-
-	"gorm.io/gorm"
 )
 
 func SendCode(c *gin.Context) {
@@ -83,7 +82,6 @@ func Login(c *gin.Context) {
 	ctx := c.MustGet("ctx").(context.Context)
 	limiter := c.MustGet("limiter").(*redis_rate.Limiter)
 	logger := c.MustGet("logger").(*slog.Logger)
-	db := c.MustGet("db").(*gorm.DB)
 
 	limit := redis_rate.Limit{
 		Rate:   1,
@@ -109,7 +107,7 @@ func Login(c *gin.Context) {
 	_ = rdb.Del(ctx, "code:"+req.Email).Err()
 
 	var user models.User
-	if err := db.
+	if err := db.DB.
 		Where("email = ?", req.Email).
 		FirstOrCreate(&user, models.User{Email: req.Email}).
 		Error; err != nil {

@@ -18,3 +18,15 @@ func RequireAuth(c *gin.Context) {
 	c.Set("user_id", userID)
 	c.Next()
 }
+
+func RequireAdmin(c *gin.Context) {
+	session := sessions.Default(c)
+	email := session.Get("email")
+	if email != "kenueyy@gmail.com" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "you are not admin"})
+		c.Abort()
+		return
+	}
+
+	c.Set("admin", true)
+}

@@ -39,8 +39,8 @@ func initRedis() {
 		10,
 		"tcp",
 		rdb.Options().Addr,
-		"", // username
-		"", // password
+		"",
+		"",
 		[]byte(cfg.RedisSecret),
 	)
 	if err != nil {
@@ -79,6 +79,16 @@ func main() {
 	v1.Use(middleware.RequireAuth)
 	{
 		v1.GET("/profile", handlers.Profile)
+	}
+
+	admin := v1.Group("/admin")
+	admin.Use(middleware.RequireAuth, middleware.RequireAdmin)
+	{
+		admin.POST("/plans", handlers.AddPlan)
+		admin.DELETE("/plans/:id", handlers.DeletePlanWithID)
+		admin.PATCH("/plans/:id", handlers.UpdatePlan)
+		admin.GET("/plans", handlers.GetPlans)
+		admin.GET("/plans/:id", handlers.GetPlan)
 	}
 
 	logger.Info("server starting", "port", cfg.Port)

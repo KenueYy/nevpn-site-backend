@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/KenueYy/nevpn-site-backend/internal/db"
 	"github.com/KenueYy/nevpn-site-backend/internal/models"
 	"github.com/gin-gonic/gin"
 
@@ -12,7 +13,6 @@ import (
 )
 
 func Profile(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
 	logger := c.MustGet("logger").(*slog.Logger)
 
 	userID, ok := c.Get("user_id")
@@ -22,7 +22,7 @@ func Profile(c *gin.Context) {
 	}
 
 	var user models.User
-	if err := db.First(&user, "id = ?", userID).Error; err != nil {
+	if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return

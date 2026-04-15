@@ -42,7 +42,7 @@ func Init(cfg *config.Config) error {
 		return err
 	}
 
-	if err := DB.AutoMigrate(models.User{}, models.Plan{}); err != nil {
+	if err := DB.AutoMigrate(models.User{}, models.Plan{}, models.Payment{}); err != nil {
 		logger.Error("migration failed",
 			"db_name", cfg.DBName,
 			"error", err.Error(),

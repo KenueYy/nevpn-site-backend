@@ -10,12 +10,14 @@ import (
 func RequireAuth(c *gin.Context) {
 	session := sessions.Default(c)
 	userID := session.Get("user_id")
+	email := session.Get("email")
 	if userID == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		c.Abort()
 		return
 	}
 	c.Set("user_id", userID)
+	c.Set("email", email)
 	c.Next()
 }
 

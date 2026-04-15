@@ -8,15 +8,20 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var CFG *Config
+
 type Config struct {
-	DBHost      string
-	DBPort      int
-	DBUser      string
-	DBPassword  string
-	DBName      string
-	DBSSLMode   string
-	Port        int
-	RedisSecret string
+	DBHost            string
+	DBPort            int
+	DBUser            string
+	DBPassword        string
+	DBName            string
+	DBSSLMode         string
+	Port              int
+	RedisSecret       string
+	YooKassaShopID    string
+	YooKassaSecretKey string
+	RemnaToken        string
 }
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -49,14 +54,18 @@ func Load() *Config {
 	}
 
 	config := Config{
-		DBHost:      os.Getenv("DB_HOST"),
-		DBPort:      dbPort,
-		DBUser:      os.Getenv("DB_USER"),
-		DBPassword:  os.Getenv("DB_PASSWORD"),
-		DBName:      os.Getenv("DB_NAME"),
-		DBSSLMode:   os.Getenv("DB_SSLMODE"),
-		RedisSecret: os.Getenv("REDIS_SECRET"),
-		Port:        port,
+		DBHost:            os.Getenv("DB_HOST"),
+		DBPort:            dbPort,
+		DBUser:            os.Getenv("DB_USER"),
+		DBPassword:        os.Getenv("DB_PASSWORD"),
+		DBName:            os.Getenv("DB_NAME"),
+		DBSSLMode:         os.Getenv("DB_SSLMODE"),
+		RedisSecret:       os.Getenv("REDIS_SECRET"),
+		YooKassaShopID:    os.Getenv("YOOKASSA_SHOP_ID"),
+		YooKassaSecretKey: os.Getenv("YOOKASSA_SECRET_KEY"),
+		RemnaToken:        os.Getenv("REMNA_TOKEN"),
+
+		Port: port,
 	}
 
 	logger.Info("config loaded",
@@ -65,6 +74,8 @@ func Load() *Config {
 		"db_name", config.DBName,
 		"port", config.Port,
 	)
+
+	CFG = &config
 
 	return &config
 }

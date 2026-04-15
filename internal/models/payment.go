@@ -7,13 +7,12 @@ import (
 )
 
 type Payment struct {
-	ID                uuid.UUID
-	SubscriptionID    uuid.UUID
-	Provider          string
-	ProviderPaymentID string
-	Amount            float64
-	Currency          string
-	Status            string
-	PaidAt            *time.Time
-	CreatedAt         time.Time
+	ID       string    `gorm:"primaryKey"`
+	UserID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	PlanID   uint      `gorm:"not null;index"`
+	Provider string    `gorm:"not null"`
+	Amount   int64     `gorm:"not null"`
+	Status   string    `gorm:"not null"`
+
+	CreatedAt time.Time
 }

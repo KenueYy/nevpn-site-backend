@@ -12,6 +12,7 @@ type Plan struct {
 	Price        int64  `gorm:"not null"`
 	DurationDays int    `gorm:"not null"`
 	MaxDevices   int    `gorm:"not null"`
+	Tag          string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

@@ -9,10 +9,11 @@ import (
 type Subscription struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
-	PlanID    int
-	Status    string
+	PlanID    uint
+	Plan      Plan
 	StartedAt time.Time
 	ExpiresAt time.Time
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

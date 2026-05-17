@@ -3,7 +3,7 @@ version: "3.8"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: wallet-postgres
+    container_name: postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -15,4 +15,3 @@ services:
 
 volumes:
   postgres_data:
-  postgres_test_data:

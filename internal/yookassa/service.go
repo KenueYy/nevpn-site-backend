@@ -102,13 +102,12 @@ func (s *YooKassaService) PaymentSuccess(ctx context.Context, userID uuid.UUID, 
 
 	rUser, err := s.remnaService.GetUserByEmail(bgCtx, email)
 	if err != nil {
-		if err.Error() == "Not found user by this email" {
+		if err.Error() == "not found user by this email" {
 			_, err := s.remnaService.CreateNewUser(ctx, &remna.RemnaUserRequest{
 				Username:        userID.String(),
 				UUID:            userID.String(),
 				Status:          "ACTIVE",
 				Email:           email,
-				Tag:             plan.Tag,
 				HwidDeviceLimit: uint(plan.MaxDevices),
 				ExpireAt:        &expire,
 				ActiveInternalSquads: []string{

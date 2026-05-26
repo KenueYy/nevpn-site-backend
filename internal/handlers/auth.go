@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/KenueYy/nevpn-site-backend/internal/config"
 	"github.com/KenueYy/nevpn-site-backend/internal/db"
 	"github.com/KenueYy/nevpn-site-backend/internal/models"
 	"github.com/gin-contrib/sessions"
@@ -19,18 +19,23 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type EmailReq struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type LoginRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
 func SendCode(c *gin.Context) {
-	var req models.EmailCode
 	rdb := c.MustGet("rdb").(*redis.Client)
 	ctx := c.MustGet("ctx").(context.Context)
 	limiter := c.MustGet("limiter").(*redis_rate.Limiter)
 	logger := c.MustGet("logger").(*slog.Logger)
+	cfg := c.MustGet("cfg").(*config.Config)
 
-	type EmailReq struct {
-		Email string `json:"email" binding:"required,email"`
-	}
 	var eReq EmailReq
-
 	if err := c.ShouldBindJSON(&eReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -41,47 +46,48 @@ func SendCode(c *gin.Context) {
 		Burst:  1,
 		Period: time.Minute / 10,
 	}
-	res, err := limiter.Allow(ctx, "sendcode:"+req.Email, limit)
+	res, err := limiter.Allow(ctx, "sendcode:"+eReq.Email, limit)
 	if err != nil || res.Allowed != 1 {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many requests"})
 		return
 	}
 
-	n := rand.Intn(999999)
-	code := fmt.Sprintf(strconv.Itoa(n))
+	code := fmt.Sprintf("%06d", rand.Intn(1000000))
 
-	if err := rdb.Set(ctx, "code:"+eReq.Email, code, 10000*time.Minute).Err(); err != nil {
-		logger.Error("redis set failed", "email", req.Email, "error", err)
+	if err := rdb.Set(ctx, "code:"+eReq.Email, code, 15*time.Minute).Err(); err != nil {
+		logger.Error("redis set failed", "email", eReq.Email, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
 		return
 	}
 
-	client := &http.Client{}
-	sendReq := map[string]string{"Email": eReq.Email,
-		"Code": code}
+	sendReq := map[string]string{"Email": eReq.Email, "Code": code}
 	sendJSON, _ := json.Marshal(sendReq)
-	resp, _ := client.Post("http://localhost:4444/api/v1/sendcode",
-		"application/json", bytes.NewBuffer(sendJSON))
-	fmt.Println("Send code:", resp.Status)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(cfg.MailServiceURL, "application/json", bytes.NewBuffer(sendJSON))
+	if err != nil {
+		logger.Error("mail service request failed", "email", eReq.Email, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send code"})
+		return
+	}
 	resp.Body.Close()
 
-	logger.Info("code sent", "email", req.Email)
+	logger.Info("code sent", "email", eReq.Email)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Code sent", "retry_after": 60})
 }
 
-type LoginRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  string `json:"code" binding:"required,len=6"`
-}
-
 func Login(c *gin.Context) {
-	var req LoginRequest
-
 	rdb := c.MustGet("rdb").(*redis.Client)
 	ctx := c.MustGet("ctx").(context.Context)
 	limiter := c.MustGet("limiter").(*redis_rate.Limiter)
 	logger := c.MustGet("logger").(*slog.Logger)
+	cfg := c.MustGet("cfg").(*config.Config)
+
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	limit := redis_rate.Limit{
 		Rate:   1,
@@ -91,11 +97,6 @@ func Login(c *gin.Context) {
 	res, err := limiter.Allow(ctx, "login:"+req.Email, limit)
 	if err != nil || res.Allowed != 1 {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many requests"})
-		return
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -116,9 +117,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	role := "user"
+	if cfg.IsAdmin(user.Email) {
+		role = "admin"
+	}
+
 	session := sessions.Default(c)
 	session.Set("user_id", user.ID.String())
 	session.Set("email", user.Email)
+	session.Set("role", role)
 	session.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   24 * 3600,
@@ -134,6 +141,22 @@ func Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Logged in",
-		"user":    user,
+		"user": gin.H{
+			"id":         user.ID,
+			"email":      user.Email,
+			"role":       role,
+			"created_at": user.CreatedAt,
+		},
 	})
+}
+
+func Logout(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Clear()
+	session.Options(sessions.Options{
+		Path:   "/",
+		MaxAge: -1,
+	})
+	_ = session.Save()
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out"})
 }

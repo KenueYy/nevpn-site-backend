@@ -92,7 +92,7 @@ func (h *RemnaHandler) GetUserByTelegramID(c *gin.Context) {
 		"telegram_id", id,
 	)
 
-	user, err := h.service.GetUserByUUID(c.Request.Context(), id)
+	user, err := h.service.GetUserByTelegramID(c.Request.Context(), id)
 	if err != nil {
 		h.logger.Error("RemnaHandler: GetUserByTelegramID failed",
 			"telegram_id", id,

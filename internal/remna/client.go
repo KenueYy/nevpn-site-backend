@@ -60,7 +60,7 @@ func NewClient(cfg *config.Config, logger *slog.Logger) *RemnaClient {
 }
 
 func (c *RemnaClient) newRemnaRequest(ctx context.Context, method string, url string, body io.Reader) (*http.Response, error) {
-	reqHTTP, err := http.NewRequestWithContext(ctx, method, url, nil)
+	reqHTTP, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		c.logger.Error("RemnaClient: failed to build request",
 			"method", method,

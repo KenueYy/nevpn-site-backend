@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/KenueYy/nevpn-site-backend/internal/config"
 	"github.com/KenueYy/nevpn-site-backend/internal/db"
@@ -21,40 +22,51 @@ import (
 
 var (
 	ctx     = context.Background()
-	rdb     = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	rdb     *redis.Client
 	limiter *redis_rate.Limiter
 	store   sessions.Store
-	cfg     = config.Load()
+	cfg     *config.Config
 	logger  = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 )
 
-func initRedis() {
+func initRedis(c *config.Config) {
+	rdb = redis.NewClient(&redis.Options{Addr: c.RedisAddr})
+
 	limiter = redis_rate.NewLimiter(rdb)
 
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		logger.Error("redis ping failed", "error", err)
-		panic(err)
+	var pingErr error
+	for i := 0; i < 30; i++ {
+		pingErr = rdb.Ping(ctx).Err()
+		if pingErr == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if pingErr != nil {
+		logger.Error("redis ping failed", "addr", c.RedisAddr, "error", pingErr)
+		panic(pingErr)
 	}
 
 	var err error
 	store, err = redisstore.NewStore(
 		10,
 		"tcp",
-		rdb.Options().Addr,
+		c.RedisAddr,
 		"",
 		"",
-		[]byte(cfg.RedisSecret),
+		[]byte(c.RedisSecret),
 	)
 	if err != nil {
 		logger.Error("session store init failed", "error", err)
 		panic(err)
 	}
 
-	logger.Info("redis store initialized")
+	logger.Info("redis store initialized", "addr", c.RedisAddr)
 }
 
 func main() {
-	initRedis()
+	cfg = config.Load()
+	initRedis(cfg)
 
 	if err := db.Init(cfg); err != nil {
 		logger.Error("failed to initialize database", "error", err.Error())
@@ -63,6 +75,7 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(middleware.CORS(cfg))
 	r.Use(func(c *gin.Context) {
 		c.Set("rdb", rdb)
 		c.Set("ctx", ctx)
@@ -75,12 +88,6 @@ func main() {
 
 	r.Use(sessions.Sessions("auth", store))
 
-	v1 := r.Group("/api/v1")
-	v1.POST("/sendcode", handlers.SendCode)
-	v1.POST("/login", handlers.Login)
-	v1.GET("/plans", handlers.GetPlans)
-	v1.GET("/plans/:id", handlers.GetPlan)
-
 	remnaClient := remna.NewClient(cfg, logger)
 	remnaService := remna.NewService(remnaClient, logger)
 	remnaHandler := remna.NewHandler(remnaService, logger)
@@ -89,28 +96,45 @@ func main() {
 	yookassaService := yookassa.NewService(yookassaClient, remnaService, logger)
 	yookassaHandler := yookassa.NewHandler(yookassaService, logger)
 
-	v1.POST("yookassa/webhook", yookassaHandler.Webhook)
+	r.Use(func(c *gin.Context) {
+		c.Set("remna_service", remnaService)
+		c.Next()
+	})
 
-	v1.GET("/remna/users", remnaHandler.GetAllUsers)
-	v1.GET("/remna/users/:uuid", remnaHandler.GetUserByUUID)
-	v1.GET("/remna/users/by-email/:email", remnaHandler.GetUserByEmail)
-	v1.GET("/remna/users/by-telegram/:id", remnaHandler.GetUserByTelegramID)
-	v1.PATCH("/remna/users", remnaHandler.UpdateUser)
-	v1.POST("/remna/users", remnaHandler.CreateNewUser)
+	v1 := r.Group("/api/v1")
 
-	v1.Use(middleware.RequireAuth)
+	v1.POST("/sendcode", handlers.SendCode)
+	v1.POST("/login", handlers.Login)
+	v1.GET("/plans", handlers.GetPlans)
+	v1.GET("/plans/:id", handlers.GetPlan)
+	v1.GET("/support", handlers.GetSupport)
+	v1.POST("/yookassa/webhook", yookassaHandler.Webhook)
+
+	auth := v1.Group("")
+	auth.Use(middleware.RequireAuth)
 	{
-		v1.GET("/profile", handlers.Profile)
-		v1.POST("/yookassa/payment/create", yookassaHandler.CreatePayment)
-
+		auth.GET("/profile", handlers.Profile)
+		auth.GET("/me", handlers.Me)
+		auth.POST("/logout", handlers.Logout)
+		auth.GET("/subscription", handlers.GetSubscription)
+		auth.POST("/yookassa/payment/create", yookassaHandler.CreatePayment)
 	}
 
 	admin := v1.Group("/admin")
 	admin.Use(middleware.RequireAuth, middleware.RequireAdmin)
 	{
+		admin.GET("/plans", handlers.AdminListPlans)
 		admin.POST("/plans", handlers.AddPlan)
+		admin.PATCH("/plans/reorder", handlers.AdminReorderPlans)
 		admin.DELETE("/plans/:id", handlers.DeletePlanWithID)
 		admin.PATCH("/plans/:id", handlers.UpdatePlan)
+
+		admin.GET("/remna/users", remnaHandler.GetAllUsers)
+		admin.GET("/remna/users/:uuid", remnaHandler.GetUserByUUID)
+		admin.GET("/remna/users/by-email/:email", remnaHandler.GetUserByEmail)
+		admin.GET("/remna/users/by-telegram/:id", remnaHandler.GetUserByTelegramID)
+		admin.PATCH("/remna/users", remnaHandler.UpdateUser)
+		admin.POST("/remna/users", remnaHandler.CreateNewUser)
 	}
 
 	logger.Info("server starting", "port", cfg.Port)

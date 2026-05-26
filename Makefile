@@ -1,32 +1,14 @@
-.PHONY: run test-rpc test-go test-all docker-up docker-down clean
+.PHONY: up down build logs
 
-run:
-	docker compose up -d postgres
+# Запуск всего стека (фронт + бэк + postgres + redis)
+up:
+	docker compose up --build -d
 
-test-rpc:
-	docker compose up -d postgres
-	docker compose up -d api 
-	docker compose up k6
-	docker compose down 
+down:
+	docker compose down
 
-test-go:
-	docker compose up -d postgres_test
-	docker compose run --rm tests
-	docker compose down 
+build:
+	docker compose build
 
-test-all:
-	docker compose up -d postgres
-	docker compose up -d api 
-	docker compose up --exit-code-from k6 k6
-	docker compose up -d postgres_test
-	docker compose run --rm tests
-	docker compose down -v
-
-docker-up:
-	docker compose up -d
-
-docker-down:
-	docker compose down -v
-
-clean:
-	go clean -cache
+logs:
+	docker compose logs -f

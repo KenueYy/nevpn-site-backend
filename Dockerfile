@@ -12,10 +12,7 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 COPY go.mod go.sum ./
-RUN go mod download
-
-COPY cmd/ ./cmd/
-COPY internal/ ./internal/
+COPY . .
 
 RUN go build -ldflags="-s -w" -o /server ./cmd/server
 
@@ -25,8 +22,5 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /server ./server
-
-EXPOSE 7080
-ENV PORT=7080
 
 CMD ["./server"]

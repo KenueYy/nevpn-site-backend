@@ -7,6 +7,9 @@ RUN apk add --no-cache git ca-certificates
 ENV GO111MODULE=on
 ENV GOPROXY=https://goproxy.cn,direct
 ENV GOSUMDB=off
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -14,7 +17,7 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /server ./cmd/server
+RUN go build -ldflags="-s -w" -o /server ./cmd/server
 
 FROM alpine:3.20
 

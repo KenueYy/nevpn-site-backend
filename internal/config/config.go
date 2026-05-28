@@ -63,7 +63,7 @@ func Load() *Config {
 			"http://127.0.0.1:8080",
 		}),
 
-		SupportTelegramURL:    envOr("SUPPORT_TELEGRAM_URL", "https://t.me/nevpn_support"),
+		SupportTelegramURL:    envOr("SUPPORT_TELEGRAM_URL", "https://t.me/KenueYx"),
 		SupportTelegramHandle: envOr("SUPPORT_TELEGRAM_HANDLE", "@nevpn_support"),
 		SupportEmail:          envOr("SUPPORT_EMAIL", "support@nevpn.shop"),
 		MailServiceURL:        envOr("MAIL_SERVICE_URL", "http://localhost:4444/api/v1/sendcode"),

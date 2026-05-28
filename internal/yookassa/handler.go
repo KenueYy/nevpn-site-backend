@@ -1,6 +1,7 @@
 package yookassa
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -95,6 +96,65 @@ func (h *YooKassaHandler) CreatePayment(c *gin.Context) {
 		"email", email,
 		"plan_id", req.PlanID,
 	)
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *YooKassaHandler) CreateCustomPayment(c *gin.Context) {
+	h.logger.Info("YooKassaHandler: CreateCustomPayment started")
+
+	userIDVal, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID, _ := userIDVal.(string)
+
+	emailVal, ok := c.Get("email")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	email, _ := emailVal.(string)
+
+	var req struct {
+		Price       int64  `json:"price" binding:"required"`
+		Months      int    `json:"months" binding:"required"`
+		Devices     int    `json:"devices" binding:"required"`
+		Unlimited   bool   `json:"unlimited"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	desc := req.Description
+	if desc == "" {
+		desc = fmt.Sprintf("Оплата подписки neVPN (%d мес, %d устр)", req.Months, req.Devices)
+	}
+
+	durationDays := req.Months * 30
+	devices := req.Devices
+	if req.Unlimited {
+		devices = 99999
+	}
+
+	resp, err := h.service.CreateCustomPayment(
+		c.Request.Context(),
+		userID, email,
+		req.Price, desc,
+		durationDays, devices,
+	)
+	if err != nil {
+		h.logger.Error("YooKassaHandler: CreateCustomPayment failed",
+			"user_id", userID,
+			"error", err,
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, resp)
 }

@@ -107,6 +107,7 @@ func main() {
 	v1.POST("/login", handlers.Login)
 	v1.GET("/plans", handlers.GetPlans)
 	v1.GET("/plans/:id", handlers.GetPlan)
+	v1.POST("/plans/calculate", handlers.CalculatePlan)
 	v1.GET("/support", handlers.GetSupport)
 	v1.POST("/yookassa/webhook", yookassaHandler.Webhook)
 
@@ -118,6 +119,7 @@ func main() {
 		auth.POST("/logout", handlers.Logout)
 		auth.GET("/subscription", handlers.GetSubscription)
 		auth.POST("/yookassa/payment/create", yookassaHandler.CreatePayment)
+		auth.POST("/yookassa/payment/create-custom", yookassaHandler.CreateCustomPayment)
 	}
 
 	admin := v1.Group("/admin")

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -216,6 +217,101 @@ func AdminReorderPlans(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+type planCalculateInput struct {
+	Months    int  `json:"months" binding:"required"`
+	Devices   int  `json:"devices" binding:"required"`
+	Unlimited bool `json:"unlimited"`
+}
+
+type planCalculateResponse struct {
+	Price        int64 `json:"price"`
+	DurationDays int   `json:"duration_days"`
+	MaxDevices   int   `json:"max_devices"`
+}
+
+// knownP1 returns base price for 1 device at given days.
+// Points: (30, 160), (60, 290), (365, 1699).
+func knownP1(days int) float64 {
+	switch {
+	case days <= 30:
+		return 160
+	case days <= 60:
+		// linear between (30, 160) and (60, 290)
+		return 160 + (290-160)*float64(days-30)/30
+	case days <= 365:
+		// linear between (60, 290) and (365, 1699)
+		return 290 + (1699-290)*float64(days-60)/(365-60)
+	default:
+		// extrapolate from 365-day rate
+		return 1699 * float64(days) / 365
+	}
+}
+
+// knownRatio returns the Padd/P1 ratio for a given duration.
+// From data: 30d→0.5625, 60d→0.7207, 365d→0.5297.
+func knownRatio(days int) float64 {
+	switch {
+	case days <= 30:
+		return 0.56
+	case days <= 60:
+		return 0.56 + (0.72-0.56)*float64(days-30)/30
+	case days <= 365:
+		return 0.72 + (0.53-0.72)*float64(days-60)/(365-60)
+	default:
+		return 0.53
+	}
+}
+
+// CalculatePlan returns a dynamic plan price based on months and devices.
+// Formula: Price(U, D) = P1(D) + (U − 1) × Padd(D)
+// where P1(D) = base 1-device price, Padd(D) = P1(D) × ratio(D).
+// Unlimited checkbox → count as 10 devices.
+func CalculatePlan(c *gin.Context) {
+	var input planCalculateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if input.Months < 1 || input.Months > 24 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "months must be between 1 and 24"})
+		return
+	}
+
+	devices := input.Devices
+	if input.Unlimited {
+		devices = 10
+	}
+	if devices < 1 || devices > 10 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "devices must be between 1 and 10"})
+		return
+	}
+
+	days := input.Months * 30
+
+	p1 := knownP1(days)
+	ratio := knownRatio(days)
+	pAdd := p1 * ratio
+
+	price := int64(math.Round(p1 + float64(devices-1)*pAdd))
+	if price < 99 {
+		price = 99
+	}
+
+	maxDevices := devices
+	if input.Unlimited {
+		maxDevices = 99999
+	}
+
+	resp := planCalculateResponse{
+		Price:        price,
+		DurationDays: days,
+		MaxDevices:   maxDevices,
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // ParsePlanID helper for tests

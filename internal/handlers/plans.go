@@ -250,15 +250,16 @@ func knownP1(days int) float64 {
 }
 
 // knownRatio returns the Padd/P1 ratio for a given duration.
-// From data: 30d→0.5625, 60d→0.7207, 365d→0.5297.
+
+// Anchor points: 30d→0.75, 60d→0.87, 365d→0.53.
 func knownRatio(days int) float64 {
 	switch {
 	case days <= 30:
-		return 0.56
+		return 0.75
 	case days <= 60:
-		return 0.56 + (0.72-0.56)*float64(days-30)/30
+		return 0.75 + (0.87-0.75)*float64(days-30)/30
 	case days <= 365:
-		return 0.72 + (0.53-0.72)*float64(days-60)/(365-60)
+		return 0.87 + (0.53-0.87)*float64(days-60)/(365-60)
 	default:
 		return 0.53
 	}

@@ -75,6 +75,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
+
 	if err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS subscription_notifications (
 			id TEXT PRIMARY KEY,
@@ -97,7 +98,7 @@ func TestCheckExpiringSubscriptions_SendsExpiringSoon(t *testing.T) {
 		users: []remna.RemnaUserResponse{
 			{
 				UUID:     "uuid-1",
-				Email:    "kenueyy@gmail.com",
+				Email:    "test@example.com",
 				ExpireAt: time.Now().Add(3 * 24 * time.Hour), // 3 days from now
 				Status:   "ACTIVE",
 			},
@@ -114,8 +115,8 @@ func TestCheckExpiringSubscriptions_SendsExpiringSoon(t *testing.T) {
 	if mockSend.sent[0].NotifType != "expiring_soon" {
 		t.Errorf("expected expiring_soon, got %s", mockSend.sent[0].NotifType)
 	}
-	if mockSend.sent[0].Email != "kenueyy@gmail.com" {
-		t.Errorf("expected kenueyy@gmail.com, got %s", mockSend.sent[0].Email)
+	if mockSend.sent[0].Email != "test@example.com" {
+		t.Errorf("expected test@example.com, got %s", mockSend.sent[0].Email)
 	}
 }
 
@@ -125,7 +126,7 @@ func TestCheckExpiringSubscriptions_SendsExpired(t *testing.T) {
 		users: []remna.RemnaUserResponse{
 			{
 				UUID:     "uuid-2",
-				Email:    "kenueyy@gmail.com",
+				Email:    "expired@example.com",
 				ExpireAt: time.Now().Add(-1 * time.Hour), // already expired
 				Status:   "ACTIVE",
 			},

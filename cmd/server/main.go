@@ -123,6 +123,7 @@ func main() {
 		auth.GET("/subscription", handlers.GetSubscription)
 		auth.POST("/yookassa/payment/create", yookassaHandler.CreatePayment)
 		auth.POST("/yookassa/payment/create-custom", yookassaHandler.CreateCustomPayment)
+		auth.POST("/trial", handlers.StartTrial)
 	}
 
 	admin := v1.Group("/admin")

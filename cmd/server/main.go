@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/KenueYy/nevpn-site-backend/internal/config"
 	"github.com/KenueYy/nevpn-site-backend/internal/db"
 	"github.com/KenueYy/nevpn-site-backend/internal/handlers"
+	"github.com/KenueYy/nevpn-site-backend/internal/jobs"
 	"github.com/KenueYy/nevpn-site-backend/internal/middleware"
 	"github.com/KenueYy/nevpn-site-backend/internal/remna"
 	"github.com/KenueYy/nevpn-site-backend/internal/yookassa"
@@ -18,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/redis/go-redis/v9"
+	"github.com/robfig/cron/v3"
 )
 
 var (
@@ -138,6 +141,40 @@ func main() {
 		admin.PATCH("/remna/users", remnaHandler.UpdateUser)
 		admin.POST("/remna/users", remnaHandler.CreateNewUser)
 	}
+
+	// Cron scheduler for subscription notifications — runs daily at 12:00 server time.
+	c := cron.New(cron.WithLocation(time.Local))
+
+	subscriptionSender := &jobs.HTTPSender{
+		Client:     &http.Client{Timeout: 15 * time.Second},
+		ServiceURL: cfg.SmtpSubscriptionURL,
+		Logger:     logger,
+	}
+
+	subscriptionJob := jobs.NewCheckExpiringSubscriptionsJob(
+		remnaService,
+		db.DB,
+		subscriptionSender,
+		cfg.SubscriptionRenewalURL,
+		logger,
+	)
+
+	// Run once at startup for immediate check (non-blocking)
+	go func() {
+		logger.Info("running initial subscription notification check")
+		subscriptionJob.Run(ctx)
+	}()
+
+	_, err := c.AddFunc("0 12 * * *", func() {
+		logger.Info("cron: starting subscription notification check")
+		subscriptionJob.Run(ctx)
+	})
+	if err != nil {
+		logger.Error("failed to register cron job", "error", err)
+		os.Exit(1)
+	}
+
+	c.Start()
 
 	logger.Info("server starting", "port", cfg.Port)
 	r.Run(":" + strconv.Itoa(cfg.Port))

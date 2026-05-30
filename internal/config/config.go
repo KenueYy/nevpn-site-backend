@@ -32,6 +32,8 @@ type Config struct {
 	SupportTelegramHandle string
 	SupportEmail          string
 	MailServiceURL        string
+	SmtpSubscriptionURL   string
+	SubscriptionRenewalURL string
 }
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -67,6 +69,8 @@ func Load() *Config {
 		SupportTelegramHandle: envOr("SUPPORT_TELEGRAM_HANDLE", "@nevpn_support"),
 		SupportEmail:          envOr("SUPPORT_EMAIL", "support@nevpn.shop"),
 		MailServiceURL:        envOr("MAIL_SERVICE_URL", "http://localhost:4444/api/v1/sendcode"),
+		SmtpSubscriptionURL:   envOr("SMTP_SUBSCRIPTION_URL", "http://localhost:4444/api/v1/subscription-notify"),
+		SubscriptionRenewalURL: envOr("SUBSCRIPTION_RENEWAL_URL", "https://nevpn.shop/account"),
 	}
 
 	validate(cfg)

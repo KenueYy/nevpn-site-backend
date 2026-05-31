@@ -112,6 +112,7 @@ func main() {
 	v1.GET("/plans/:id", handlers.GetPlan)
 	v1.POST("/plans/calculate", handlers.CalculatePlan)
 	v1.GET("/support", handlers.GetSupport)
+	v1.POST("/support/tickets", handlers.CreateTicket)
 	v1.POST("/yookassa/webhook", yookassaHandler.Webhook)
 
 	auth := v1.Group("")

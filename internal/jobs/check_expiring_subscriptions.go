@@ -26,11 +26,16 @@ type HTTPSender struct {
 }
 
 func (s *HTTPSender) SendSubscriptionNotification(ctx context.Context, email, notifType string, expireDate time.Time, renewalURL string) error {
+	daysLeft := int(time.Until(expireDate).Hours() / 24)
+	if daysLeft < 0 {
+		daysLeft = 0
+	}
 	payload := map[string]any{
 		"email":       email,
 		"type":        notifType,
 		"expire_date": expireDate,
 		"renewal_url": renewalURL,
+		"days_left":   daysLeft,
 	}
 	body, _ := json.Marshal(payload)
 

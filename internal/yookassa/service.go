@@ -79,7 +79,7 @@ func (s *YooKassaService) CreateCustomPayment(
 		Capture: true,
 		Confirmation: Confirmation{
 			Type:      "redirect",
-			ReturnURL: "https://nevpn.shop/",
+			ReturnURL: "https://nevpn.shop/profile",
 		},
 		Description: description,
 		Metadata: map[string]string{

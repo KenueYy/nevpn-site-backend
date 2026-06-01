@@ -26,7 +26,7 @@ type HTTPSender struct {
 }
 
 func (s *HTTPSender) SendSubscriptionNotification(ctx context.Context, email, notifType string, expireDate time.Time, renewalURL string) error {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"email":       email,
 		"type":        notifType,
 		"expire_date": expireDate,
@@ -108,13 +108,13 @@ func (j *CheckExpiringSubscriptionsJob) Run(ctx context.Context) {
 
 		if user.ExpireAt.Before(now) {
 			notifType = models.NotifExpired
-		} else if isWithinDay(user.ExpireAt, threeDaysFromNow) {
+		} else if !user.ExpireAt.After(threeDaysFromNow) {
 			notifType = models.NotifExpiringSoon
 		} else {
 			continue
 		}
 
-		if j.alreadyNotified(user.UUID, notifType) {
+		if j.alreadyNotified(user.UUID, notifType, now) {
 			continue
 		}
 
@@ -163,14 +163,29 @@ func (j *CheckExpiringSubscriptionsJob) Run(ctx context.Context) {
 	)
 }
 
-func isWithinDay(a, b time.Time) bool {
-	return a.Year() == b.Year() && a.YearDay() == b.YearDay()
+// alreadyNotified returns true if a notification of the given type was already sent
+// to the user. For expiring_soon — only checks today (calendar day), allowing one
+// notification per day. For expired — checks all time (one and done).
+func (j *CheckExpiringSubscriptionsJob) alreadyNotified(remnaUUID string, notifType models.NotificationType, now time.Time) bool {
+	var count int64
+
+	switch notifType {
+	case models.NotifExpiringSoon:
+		// One per day: check if already sent today.
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		j.DB.Model(&models.SubscriptionNotification{}).
+			Where("remna_uuid = ? AND type = ? AND sent_at >= ?", remnaUUID, string(notifType), startOfDay).
+			Count(&count)
+	default:
+		// Expired — one notification ever.
+		j.DB.Model(&models.SubscriptionNotification{}).
+			Where("remna_uuid = ? AND type = ?", remnaUUID, string(notifType)).
+			Count(&count)
+	}
+
+	return count > 0
 }
 
-func (j *CheckExpiringSubscriptionsJob) alreadyNotified(remnaUUID string, notifType models.NotificationType) bool {
-	var count int64
-	j.DB.Model(&models.SubscriptionNotification{}).
-		Where("remna_uuid = ? AND type = ?", remnaUUID, string(notifType)).
-		Count(&count)
-	return count > 0
+func isWithinDay(a, b time.Time) bool {
+	return a.Year() == b.Year() && a.YearDay() == b.YearDay()
 }

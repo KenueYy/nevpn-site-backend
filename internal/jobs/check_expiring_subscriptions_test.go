@@ -296,6 +296,71 @@ func TestCheckExpiringSubscriptions_ZeroExpireAt(t *testing.T) {
 	}
 }
 
+func TestCheckExpiringSubscriptions_ExpiringSoonDaily(t *testing.T) {
+	// Notification sent yesterday should NOT prevent sending again today.
+	db := setupTestDB(t)
+
+	// Pre-create a notification record from yesterday
+	db.Create(&models.SubscriptionNotification{
+		ID:        uuid.New(),
+		RemnaUUID: "uuid-daily",
+		Email:     "daily@example.com",
+		Type:      models.NotifExpiringSoon,
+		SentAt:    time.Now().Add(-24 * time.Hour),
+	})
+
+	mockRemna := &mockRemnaService{
+		users: []remna.RemnaUserResponse{
+			{
+				UUID:     "uuid-daily",
+				Email:    "daily@example.com",
+				ExpireAt: time.Now().Add(2 * 24 * time.Hour), // 2 days left
+				Status:   "ACTIVE",
+			},
+		},
+	}
+	mockSend := &mockSender{}
+
+	job := NewCheckExpiringSubscriptionsJob(mockRemna, db, mockSend, "https://nevpn.shop/account", testLogger)
+	job.Run(context.Background())
+
+	if len(mockSend.sent) != 1 {
+		t.Fatalf("expected 1 notification (yesterday's should not block today), got %d", len(mockSend.sent))
+	}
+}
+
+func TestCheckExpiringSubscriptions_ExpiredOnce(t *testing.T) {
+	// Expired notification sent yesterday should NOT be sent again (all-time dedup).
+	db := setupTestDB(t)
+
+	db.Create(&models.SubscriptionNotification{
+		ID:        uuid.New(),
+		RemnaUUID: "uuid-expired-once",
+		Email:     "expired-once@example.com",
+		Type:      models.NotifExpired,
+		SentAt:    time.Now().Add(-24 * time.Hour),
+	})
+
+	mockRemna := &mockRemnaService{
+		users: []remna.RemnaUserResponse{
+			{
+				UUID:     "uuid-expired-once",
+				Email:    "expired-once@example.com",
+				ExpireAt: time.Now().Add(-1 * time.Hour), // expired
+				Status:   "ACTIVE",
+			},
+		},
+	}
+	mockSend := &mockSender{}
+
+	job := NewCheckExpiringSubscriptionsJob(mockRemna, db, mockSend, "https://nevpn.shop/account", testLogger)
+	job.Run(context.Background())
+
+	if len(mockSend.sent) != 0 {
+		t.Errorf("expected 0 expired notifications (all-time dedup), got %d", len(mockSend.sent))
+	}
+}
+
 func TestIsWithinDay(t *testing.T) {
 	tests := []struct {
 		a, b     time.Time

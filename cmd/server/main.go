@@ -125,6 +125,7 @@ func main() {
 		auth.POST("/yookassa/payment/create", yookassaHandler.CreatePayment)
 		auth.POST("/yookassa/payment/create-custom", yookassaHandler.CreateCustomPayment)
 		auth.POST("/trial", handlers.StartTrial)
+		auth.GET("/tickets", handlers.GetTickets)
 	}
 
 	admin := v1.Group("/admin")
@@ -135,6 +136,9 @@ func main() {
 		admin.PATCH("/plans/reorder", handlers.AdminReorderPlans)
 		admin.DELETE("/plans/:id", handlers.DeletePlanWithID)
 		admin.PATCH("/plans/:id", handlers.UpdatePlan)
+
+		admin.GET("/tickets", handlers.AdminGetAllTickets)
+		admin.PATCH("/tickets/:id", handlers.AdminUpdateTicketStatus)
 
 		admin.GET("/remna/users", remnaHandler.GetAllUsers)
 		admin.GET("/remna/users/:uuid", remnaHandler.GetUserByUUID)
